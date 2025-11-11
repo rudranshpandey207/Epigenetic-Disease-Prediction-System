@@ -1,0 +1,69 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+*.joblib
+
+# --- Virtual Environment ---
+venv/
+env/
+ENV/
+.venv/
+Scripts/
+bin/
+Lib/
+Include/
+
+# --- Environment & Config Files ---
+*.env
+.env
+.DS_Store
+.idea/
+.vscode/
+
+# --- Logs & Cache ---
+*.log
+*.pot
+*.pyc
+*.cache/
+*.pytest_cache/
+.cache/
+logs/
+
+# --- Jupyter & Kaggle ---
+.ipynb_checkpoints/
+*.ipynb
+kaggle/working/
+kaggle/input/
+
+# --- Data Files ---
+*.csv
+*.xlsx
+*.npy
+*.npz
+*.h5
+*.dat
+*.bin
+
+# --- Model Files ---
+*.pkl
+*.sav
+*.hdf5
+
+# --- Encryption Keys ---
+private_key.pem
+public_key.pem
+
+# --- Streamlit ---
+.streamlit/
+credentials.toml
+
+# --- Cloud API Files ---
+token.json
+credentials.json
+
+# --- OS Specific ---
+Thumbs.db
+desktop.ini
