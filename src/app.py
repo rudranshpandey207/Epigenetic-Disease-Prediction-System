@@ -3,6 +3,15 @@ import pandas as pd
 import pickle
 import os
 from pathlib import Path
+import io
+from PIL import Image
+import pytesseract
+import PyPDF2
+from docx import Document
+import re
+
+# Add after imports
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # Page configuration
 st.set_page_config(
@@ -42,6 +51,112 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
+# Function to extract text from PDF
+def extract_text_from_pdf(pdf_file):
+    try:
+        pdf_reader = PyPDF2.PdfReader(pdf_file)
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text()
+        return text
+    except Exception as e:
+        st.error(f"Error extracting PDF: {str(e)}")
+        return None
+
+# Function to extract text from Word document
+def extract_text_from_docx(docx_file):
+    try:
+        doc = Document(docx_file)
+        text = ""
+        for paragraph in doc.paragraphs:
+            text += paragraph.text + "\n"
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    text += cell.text + "\t"
+                text += "\n"
+        return text
+    except Exception as e:
+        st.error(f"Error extracting Word document: {str(e)}")
+        return None
+
+# Function to extract text from image using OCR
+def extract_text_from_image(image_file):
+    try:
+        image = Image.open(image_file)
+        text = pytesseract.image_to_string(image)
+        return text
+    except Exception as e:
+        st.error(f"Error extracting image: {str(e)}")
+        return None
+
+# Function to parse text to DataFrame
+def parse_text_to_dataframe(text):
+    try:
+        # Split by lines
+        lines = text.strip().split('\n')
+        
+        # Try to detect delimiter (comma, tab, space)
+        first_line = lines[0]
+        if '\t' in first_line:
+            delimiter = '\t'
+        elif ',' in first_line:
+            delimiter = ','
+        else:
+            delimiter = r'\s+'
+        
+        # Parse data
+        data = []
+        for line in lines:
+            if line.strip():
+                if delimiter == r'\s+':
+                    row = re.split(delimiter, line.strip())
+                else:
+                    row = line.split(delimiter)
+                data.append(row)
+        
+        if len(data) > 0:
+            df = pd.DataFrame(data[1:], columns=data[0])
+            return df
+        return None
+    except Exception as e:
+        st.error(f"Error parsing text to dataframe: {str(e)}")
+        return None
+
+# Function to convert uploaded file to DataFrame
+def convert_to_dataframe(uploaded_file):
+    file_extension = uploaded_file.name.split('.')[-1].lower()
+    
+    if file_extension == 'csv':
+        try:
+            df = pd.read_csv(uploaded_file)
+            return df
+        except Exception as e:
+            st.error(f"Error reading CSV: {str(e)}")
+            return None
+    
+    elif file_extension == 'pdf':
+        text = extract_text_from_pdf(uploaded_file)
+        if text:
+            return parse_text_to_dataframe(text)
+        return None
+    
+    elif file_extension in ['docx', 'doc']:
+        text = extract_text_from_docx(uploaded_file)
+        if text:
+            return parse_text_to_dataframe(text)
+        return None
+    
+    elif file_extension in ['png', 'jpg', 'jpeg', 'tiff', 'bmp']:
+        text = extract_text_from_image(uploaded_file)
+        if text:
+            return parse_text_to_dataframe(text)
+        return None
+    
+    else:
+        st.error(f"Unsupported file format: {file_extension}")
+        return None
 
 # Title and description
 st.markdown('<h1 class="main-header">🧬 Epigenetic Disease Prediction System</h1>', unsafe_allow_html=True)
@@ -86,20 +201,31 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     st.markdown("### 📁 Upload Epigenetic Data")
-    st.markdown("Upload a CSV file containing DNA methylation beta values")
+    st.markdown("Upload your data in **CSV, PDF, Word, or Image** format")
     
     uploaded_file = st.file_uploader(
-        "Choose a CSV file",
-        type=['csv'],
-        help="File should contain methylation beta values (0-1) for CpG sites"
+        "Choose a file",
+        type=['csv', 'pdf', 'docx', 'doc', 'png', 'jpg', 'jpeg', 'tiff', 'bmp'],
+        help="Supported formats: CSV, PDF, Word (DOCX/DOC), Images (PNG, JPG, JPEG, TIFF, BMP)"
     )
     
     if uploaded_file is not None:
-        try:
-            # Read the uploaded file
-            df = pd.read_csv(uploaded_file)
+        file_extension = uploaded_file.name.split('.')[-1].lower()
+        
+        with st.spinner(f"🔄 Processing {file_extension.upper()} file..."):
+            # Convert file to DataFrame
+            df = convert_to_dataframe(uploaded_file)
+        
+        if df is not None:
+            st.success(f"✅ File uploaded and converted successfully! Shape: {df.shape}")
             
-            st.success(f"✅ File uploaded successfully! Shape: {df.shape}")
+            # Option to download as CSV
+            st.download_button(
+                label="💾 Download Converted CSV",
+                data=df.to_csv(index=False),
+                file_name=f"converted_{uploaded_file.name.split('.')[0]}.csv",
+                mime="text/csv"
+            )
             
             # Display data preview
             with st.expander("📋 Data Preview", expanded=True):
@@ -112,28 +238,35 @@ with col1:
                     st.metric("Columns", df.shape[1])
                 with col_c:
                     st.metric("Missing Values", df.isnull().sum().sum())
-            
-        except Exception as e:
-            st.error(f"❌ Error reading file: {str(e)}")
+        else:
             df = None
+            st.error("❌ Failed to convert file. Please check the format and try again.")
     else:
         df = None
-        st.info("👆 Please upload a CSV file to begin prediction")
+        st.info("👆 Please upload a file to begin prediction")
 
 with col2:
-    st.markdown("### ℹ️ Data Format")
+    st.markdown("### ℹ️ Supported Formats")
     st.markdown("""
-    **Required CSV Format:**
+    **📄 CSV Files:**
+    - Direct upload, no conversion needed
+    
+    **📑 PDF Files:**
+    - Text extraction from tables
+    - Must contain structured data
+    
+    **📝 Word Documents (.docx):**
+    - Text and table extraction
+    - Structured data format
+    
+    **🖼️ Images (PNG, JPG, TIFF):**
+    - OCR text extraction
+    - Clear, high-quality images work best
+    
+    **Required Data Format:**
     - First column: Sample IDs
     - Other columns: CpG site beta values
     - Values should be between 0 and 1
-    
-    **Example:**
-    ```
-    SampleID, cg00000029, cg00000108, ...
-    Sample1,  0.8234,     0.6543,     ...
-    Sample2,  0.7123,     0.5234,     ...
-    ```
     """)
     
     # Download example file button
@@ -194,7 +327,7 @@ if df is not None:
                 st.info("Feature importance visualization will be added here")
                 # TODO: Add SHAP values or feature importance chart
 else:
-    st.warning("⚠️ Please upload a CSV file first to enable prediction")
+    st.warning("⚠️ Please upload a file first to enable prediction")
 
 # Footer
 st.markdown("---")
