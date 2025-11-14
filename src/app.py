@@ -109,13 +109,22 @@ def load_models():
 def prepare_data_for_prediction(df, model, scaler=None):
     """Prepare uploaded data to match model's expected features"""
     try:
+        # First, remove common non-feature columns
+        columns_to_drop = ['class', 'Class', 'label', 'Label', 'target', 'Target']
+        df_clean = df.copy()
+        
+        for col in columns_to_drop:
+            if col in df_clean.columns:
+                st.info(f"ℹ️ Removing target column: '{col}'")
+                df_clean = df_clean.drop(col, axis=1)
+        
         # Remove non-numeric columns (like SampleID)
-        numeric_df = df.select_dtypes(include=[np.number])
+        numeric_df = df_clean.select_dtypes(include=[np.number])
         
         # If no numeric columns, try converting
         if numeric_df.empty:
             # Try to convert all columns except first (assumed to be ID)
-            df_copy = df.iloc[:, 1:].copy()
+            df_copy = df_clean.iloc[:, 1:].copy()
             for col in df_copy.columns:
                 df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce')
             numeric_df = df_copy.select_dtypes(include=[np.number])
@@ -151,6 +160,8 @@ def prepare_data_for_prediction(df, model, scaler=None):
     
     except Exception as e:
         st.error(f"Error preparing data: {str(e)}")
+        import traceback
+        st.error(f"Detailed error:\n{traceback.format_exc()}")
         return None
 
 # Function to extract text from PDF
@@ -435,6 +446,18 @@ if df is not None:
                         
                         st.markdown("### 📊 Prediction Results")
                         
+                        # Summary statistics
+                        healthy_count = np.sum(predictions == 0)
+                        disease_count = np.sum(predictions == 1)
+                        
+                        col_stat1, col_stat2 = st.columns(2)
+                        with col_stat1:
+                            st.metric("✅ Healthy Samples", healthy_count, delta=None)
+                        with col_stat2:
+                            st.metric("⚠️ Disease Detected", disease_count, delta=None)
+                        
+                        st.markdown("---")
+                        
                         # Display results for each sample
                         for idx, (pred, conf) in enumerate(zip(predictions, confidence)):
                             sample_name = df.iloc[idx, 0] if df.shape[1] > 0 else f"Sample {idx+1}"
@@ -442,20 +465,20 @@ if df is not None:
                             if pred == 0:
                                 st.markdown(f"""
                                 <div class="prediction-box control">
-                                    <h3>{sample_name}</h3>
+                                    <h3>🆔 {sample_name}</h3>
                                     <h2>✅ Control (Healthy)</h2>
-                                    <p style="font-size: 1.2rem;">Confidence: {conf:.2%}</p>
-                                    <p>The model predicts this sample as <strong>Control/Healthy</strong> for {disease_type}.</p>
+                                    <p style="font-size: 1.5rem; font-weight: bold; color: #2E7D32;">Confidence: {conf:.2%}</p>
+                                    <p style="font-size: 1.1rem;">The model predicts this sample as <strong>Control/Healthy</strong> for {disease_type}.</p>
                                 </div>
                                 """, unsafe_allow_html=True)
                             else:
                                 st.markdown(f"""
                                 <div class="prediction-box disease">
-                                    <h3>{sample_name}</h3>
+                                    <h3>🆔 {sample_name}</h3>
                                     <h2>⚠️ Disease Detected</h2>
-                                    <p style="font-size: 1.2rem;">Confidence: {conf:.2%}</p>
-                                    <p>The model predicts this sample shows signs of <strong>{disease_type}</strong>.</p>
-                                    <p><em>⚠️ This is a computational prediction. Please consult healthcare professionals for diagnosis.</em></p>
+                                    <p style="font-size: 1.5rem; font-weight: bold; color: #C62828;">Confidence: {conf:.2%}</p>
+                                    <p style="font-size: 1.1rem;">The model predicts this sample shows signs of <strong>{disease_type}</strong>.</p>
+                                    <p style="font-size: 0.9rem; color: #666;"><em>⚠️ This is a computational prediction. Please consult healthcare professionals for diagnosis.</em></p>
                                 </div>
                                 """, unsafe_allow_html=True)
                         
