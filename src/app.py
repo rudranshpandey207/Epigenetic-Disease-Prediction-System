@@ -36,25 +36,96 @@ st.markdown("""
         color: #1E88E5;
         text-align: center;
         margin-bottom: 1rem;
+        font-weight: bold;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
     }
     .sub-header {
         font-size: 1.2rem;
-        color: #666;
+        color: #333;
         text-align: center;
         margin-bottom: 2rem;
+        font-weight: 500;
     }
     .prediction-box {
         padding: 2rem;
-        border-radius: 10px;
-        margin: 1rem 0;
+        border-radius: 15px;
+        margin: 1.5rem 0;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        border: 3px solid;
     }
     .control {
-        background-color: #C8E6C9;
-        border-left: 5px solid #4CAF50;
+        background: linear-gradient(135deg, #A5D6A7 0%, #66BB6A 100%);
+        border-color: #2E7D32;
     }
     .disease {
-        background-color: #FFCDD2;
-        border-left: 5px solid #F44336;
+        background: linear-gradient(135deg, #EF9A9A 0%, #E57373 100%);
+        border-color: #C62828;
+    }
+    .prediction-box h3 {
+        color: #000;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+        font-size: 1.4rem;
+    }
+    .prediction-box h2 {
+        margin: 0.5rem 0;
+        font-size: 2rem;
+        font-weight: bold;
+    }
+    .control h2 {
+        color: #1B5E20;
+    }
+    .disease h2 {
+        color: #B71C1C;
+    }
+    .confidence-text {
+        font-size: 1.5rem;
+        font-weight: bold;
+        margin: 1rem 0;
+    }
+    .control .confidence-text {
+        color: #1B5E20;
+    }
+    .disease .confidence-text {
+        color: #B71C1C;
+    }
+    .prediction-box p {
+        font-size: 1.1rem;
+        line-height: 1.6;
+        color: #000;
+        font-weight: 500;
+    }
+    .prediction-box strong {
+        font-weight: 700;
+        color: #000;
+    }
+    .disclaimer-text {
+        font-size: 0.95rem;
+        margin-top: 1rem;
+        color: #333;
+        font-style: italic;
+        font-weight: 500;
+    }
+    .interpretation-text {
+        font-size: 1rem;
+        margin-top: 1rem;
+        color: #222;
+        font-weight: 600;
+    }
+    .stMetric {
+        background-color: #e3f2fd;
+        padding: 1rem;
+        border-radius: 10px;
+        border: 2px solid #1976d2;
+    }
+    .stMetric label {
+        font-weight: 600;
+        color: #000;
+    }
+    .stMetric [data-testid="stMetricValue"] {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #000;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -107,10 +178,10 @@ def load_models():
 
 # Function to prepare data for prediction
 def prepare_data_for_prediction(df, model, scaler=None):
-    """Prepare uploaded data to match model's expected features"""
+    """Prepare uploaded data to match model's expected features - handles ANY dataset"""
     try:
         # First, remove common non-feature columns
-        columns_to_drop = ['class', 'Class', 'label', 'Label', 'target', 'Target']
+        columns_to_drop = ['class', 'Class', 'label', 'Label', 'target', 'Target', 'diagnosis', 'Diagnosis']
         df_clean = df.copy()
         
         for col in columns_to_drop:
@@ -118,50 +189,110 @@ def prepare_data_for_prediction(df, model, scaler=None):
                 st.info(f"ℹ️ Removing target column: '{col}'")
                 df_clean = df_clean.drop(col, axis=1)
         
-        # Remove non-numeric columns (like SampleID)
-        numeric_df = df_clean.select_dtypes(include=[np.number])
+        # Store sample IDs if present (first non-numeric column or first column starting with letters)
+        sample_ids = None
+        first_col = df_clean.columns[0]
         
-        # If no numeric columns, try converting
-        if numeric_df.empty:
-            # Try to convert all columns except first (assumed to be ID)
-            df_copy = df_clean.iloc[:, 1:].copy()
-            for col in df_copy.columns:
-                df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce')
-            numeric_df = df_copy.select_dtypes(include=[np.number])
+        # Check if first column is likely an ID column
+        if df_clean[first_col].dtype == 'object' or not str(first_col).startswith('cg'):
+            sample_ids = df_clean[first_col]
+            df_clean = df_clean.drop(first_col, axis=1)
+            st.info(f"ℹ️ Using '{first_col}' as sample ID column")
+        
+        # Convert all columns to numeric
+        for col in df_clean.columns:
+            df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce')
+        
+        # Remove any columns that couldn't be converted to numeric
+        df_clean = df_clean.select_dtypes(include=[np.number])
         
         # Get model's expected features
-        if hasattr(model, 'feature_names_in_'):
+        expected_features = None
+        if hasattr(scaler, 'feature_names_in_'):
+            expected_features = scaler.feature_names_in_
+            st.info(f"📊 Model expects {len(expected_features)} features")
+        elif hasattr(model, 'feature_names_in_'):
             expected_features = model.feature_names_in_
+            st.info(f"📊 Model expects {len(expected_features)} features")
+        else:
+            # Model doesn't have feature names, use as-is
+            st.warning("⚠️ Model doesn't have feature names. Using uploaded features as-is.")
+            if scaler is not None:
+                return pd.DataFrame(
+                    scaler.transform(df_clean),
+                    columns=df_clean.columns,
+                    index=df_clean.index
+                )
+            return df_clean
+        
+        # Create aligned dataframe with expected features
+        aligned_df = pd.DataFrame(index=df_clean.index, columns=expected_features)
+        
+        # Fill in values for features that exist in uploaded data
+        common_features = list(set(df_clean.columns) & set(expected_features))
+        missing_in_upload = set(expected_features) - set(df_clean.columns)
+        extra_in_upload = set(df_clean.columns) - set(expected_features)
+        
+        # Statistics
+        match_percentage = (len(common_features) / len(expected_features)) * 100
+        
+        st.info(f"""
+        **Feature Matching:**
+        - Common features: {len(common_features)} / {len(expected_features)} ({match_percentage:.1f}%)
+        - Missing features: {len(missing_in_upload)} (will be filled with zeros)
+        - Extra features: {len(extra_in_upload)} (will be ignored)
+        """)
+        
+        # Check if we have enough common features
+        if match_percentage < 10:
+            st.error(f"""
+            ⚠️ **Low feature match ({match_percentage:.1f}%)**
             
-            # Align columns with model's expected features
-            missing_cols = set(expected_features) - set(numeric_df.columns)
-            extra_cols = set(numeric_df.columns) - set(expected_features)
+            Your dataset has very few features in common with the trained model.
+            This usually means:
+            - Wrong disease model selected (try switching between Alzheimer's/Prostate)
+            - Dataset is not compatible with this model
+            - Dataset preprocessing is different
             
-            if missing_cols:
-                st.warning(f"⚠️ Missing {len(missing_cols)} expected features. Filling with zeros.")
-                for col in missing_cols:
-                    numeric_df[col] = 0
-            
-            if extra_cols:
-                st.info(f"ℹ️ {len(extra_cols)} extra columns will be ignored.")
-            
-            # Reorder columns to match model
-            numeric_df = numeric_df[expected_features]
+            **Expected features start with:** {list(expected_features[:5])}
+            **Your features start with:** {list(df_clean.columns[:5])}
+            """)
+            return None
+        
+        # Fill common features
+        for col in common_features:
+            aligned_df[col] = df_clean[col].values
+        
+        # Fill missing features with zeros (or could use mean/median)
+        for col in missing_in_upload:
+            aligned_df[col] = 0
+        
+        # Convert to float
+        aligned_df = aligned_df.astype(float)
         
         # Apply scaling if scaler exists
         if scaler is not None:
-            numeric_df = pd.DataFrame(
-                scaler.transform(numeric_df),
-                columns=numeric_df.columns,
-                index=numeric_df.index
+            st.info("🔧 Applying feature scaling...")
+            aligned_df = pd.DataFrame(
+                scaler.transform(aligned_df),
+                columns=aligned_df.columns,
+                index=aligned_df.index
             )
         
-        return numeric_df
+        # Warn if too many features are missing
+        if match_percentage < 50:
+            st.warning(f"""
+            ⚠️ Only {match_percentage:.1f}% of features match. 
+            Predictions may be less accurate. Consider using a dataset from the same source as the training data.
+            """)
+        
+        return aligned_df
     
     except Exception as e:
-        st.error(f"Error preparing data: {str(e)}")
+        st.error(f"❌ Error preparing data: {str(e)}")
         import traceback
-        st.error(f"Detailed error:\n{traceback.format_exc()}")
+        with st.expander("🔍 View detailed error"):
+            st.code(traceback.format_exc())
         return None
 
 # Function to extract text from PDF
@@ -417,7 +548,7 @@ st.markdown("---")
 st.markdown("### 🔮 Make Prediction")
 
 if df is not None:
-    if st.button("🚀 Predict Disease Status", type="primary", width="stretch"):
+    if st.button("🚀 Predict Disease Status", type="primary", use_container_width=True):
         # Select the appropriate model
         model_key = 'alzheimer' if disease_type == "Alzheimer's Disease" else 'prostate'
         
@@ -449,14 +580,57 @@ if df is not None:
                         # Summary statistics
                         healthy_count = np.sum(predictions == 0)
                         disease_count = np.sum(predictions == 1)
+                        total_samples = len(predictions)
                         
-                        col_stat1, col_stat2 = st.columns(2)
+                        col_stat1, col_stat2, col_stat3 = st.columns(3)
                         with col_stat1:
-                            st.metric("✅ Healthy Samples", healthy_count, delta=None)
+                            st.metric("📋 Total Samples", total_samples)
                         with col_stat2:
-                            st.metric("⚠️ Disease Detected", disease_count, delta=None)
+                            st.metric("✅ Healthy Samples", healthy_count, 
+                                     delta=f"{(healthy_count/total_samples*100):.1f}%")
+                        with col_stat3:
+                            st.metric("⚠️ Disease Detected", disease_count,
+                                     delta=f"{(disease_count/total_samples*100):.1f}%",
+                                     delta_color="inverse")
+                        
+                        # Model Performance Metrics (Expandable)
+                        with st.expander("📈 Model Performance Metrics", expanded=False):
+                            st.markdown("#### Prediction Statistics")
+                            
+                            perf_col1, perf_col2 = st.columns(2)
+                            
+                            with perf_col1:
+                                avg_confidence = np.mean(confidence)
+                                st.metric("Average Confidence", f"{avg_confidence:.2%}")
+                                
+                                healthy_conf = confidence[predictions == 0]
+                                if len(healthy_conf) > 0:
+                                    st.metric("Avg. Healthy Confidence", f"{np.mean(healthy_conf):.2%}")
+                                else:
+                                    st.metric("Avg. Healthy Confidence", "N/A")
+                            
+                            with perf_col2:
+                                disease_conf = confidence[predictions == 1]
+                                if len(disease_conf) > 0:
+                                    st.metric("Avg. Disease Confidence", f"{np.mean(disease_conf):.2%}")
+                                else:
+                                    st.metric("Avg. Disease Confidence", "N/A")
+                                
+                                st.metric("Min Confidence", f"{np.min(confidence):.2%}")
+                                st.metric("Max Confidence", f"{np.max(confidence):.2%}")
+                            
+
+                            # Distribution chart
+                            st.markdown("#### Confidence Distribution")
+                            conf_df = pd.DataFrame({
+                                'Sample': [f"Sample {i+1}" for i in range(len(confidence))],
+                                'Confidence': confidence,
+                                'Prediction': ['Healthy' if p == 0 else 'Disease' for p in predictions]
+                            })
+                            st.bar_chart(conf_df.set_index('Sample')['Confidence'])
                         
                         st.markdown("---")
+                        st.markdown("### 🔬 Individual Sample Results")
                         
                         # Display results for each sample
                         for idx, (pred, conf) in enumerate(zip(predictions, confidence)):
@@ -467,8 +641,11 @@ if df is not None:
                                 <div class="prediction-box control">
                                     <h3>🆔 {sample_name}</h3>
                                     <h2>✅ Control (Healthy)</h2>
-                                    <p style="font-size: 1.5rem; font-weight: bold; color: #2E7D32;">Confidence: {conf:.2%}</p>
-                                    <p style="font-size: 1.1rem;">The model predicts this sample as <strong>Control/Healthy</strong> for {disease_type}.</p>
+                                    <p class="confidence-text">Confidence: {conf:.2%}</p>
+                                    <p>The model predicts this sample as <strong>Control/Healthy</strong> for {disease_type}.</p>
+                                    <p class="interpretation-text">
+                                        <strong>Interpretation:</strong> Low risk of {disease_type} based on methylation patterns.
+                                    </p>
                                 </div>
                                 """, unsafe_allow_html=True)
                             else:
@@ -476,24 +653,37 @@ if df is not None:
                                 <div class="prediction-box disease">
                                     <h3>🆔 {sample_name}</h3>
                                     <h2>⚠️ Disease Detected</h2>
-                                    <p style="font-size: 1.5rem; font-weight: bold; color: #C62828;">Confidence: {conf:.2%}</p>
-                                    <p style="font-size: 1.1rem;">The model predicts this sample shows signs of <strong>{disease_type}</strong>.</p>
-                                    <p style="font-size: 0.9rem; color: #666;"><em>⚠️ This is a computational prediction. Please consult healthcare professionals for diagnosis.</em></p>
+                                    <p class="confidence-text">Confidence: {conf:.2%}</p>
+                                    <p>The model predicts this sample shows signs of <strong>{disease_type}</strong>.</p>
+                                    <p class="disclaimer-text">
+                                        ⚠️ <strong>Important:</strong> This is a computational prediction based on epigenetic markers. 
+                                        Please consult healthcare professionals for clinical diagnosis.
+                                    </p>
                                 </div>
                                 """, unsafe_allow_html=True)
                         
                         # Feature importance visualization
-                        with st.expander("📈 Top Contributing CpG Sites"):
+                        with st.expander("📊 Top Contributing CpG Sites", expanded=False):
                             if hasattr(model, 'feature_importances_'):
                                 feature_importance = pd.DataFrame({
                                     'Feature': prepared_data.columns,
                                     'Importance': model.feature_importances_
-                                }).sort_values('Importance', ascending=False).head(10)
+                                }).sort_values('Importance', ascending=False).head(20)
                                 
+                                st.markdown("#### Top 20 Most Important CpG Sites")
                                 st.bar_chart(feature_importance.set_index('Feature'))
+                                
+                                # Download feature importance
+                                csv_importance = feature_importance.to_csv(index=False)
+                                st.download_button(
+                                    label="💾 Download Feature Importance",
+                                    data=csv_importance,
+                                    file_name="feature_importance.csv",
+                                    mime="text/csv"
+                                )
                             else:
                                 st.info("Feature importance not available for this model type")
-                    
+                
                 except Exception as e:
                     st.error(f"❌ Prediction error: {str(e)}")
                     st.info("Please ensure your data format matches the model's requirements.")
