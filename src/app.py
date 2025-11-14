@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import pickle
+import joblib
 import os
 from pathlib import Path
 import io
@@ -9,6 +10,12 @@ import pytesseract
 import PyPDF2
 from docx import Document
 import re
+import numpy as np
+import warnings
+
+# Suppress sklearn version warnings
+warnings.filterwarnings('ignore', category=UserWarning)
+os.environ['PYTHONWARNINGS'] = 'ignore::UserWarning'
 
 # Add after imports
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
@@ -51,6 +58,100 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
+# Load models function
+@st.cache_resource
+def load_models():
+    models = {}
+    scalers = {}
+    
+    try:
+        # Load Alzheimer's model
+        alzheimer_model_path = Path("models/alzheimer_model.joblib")
+        if alzheimer_model_path.exists():
+            models['alzheimer'] = joblib.load(alzheimer_model_path)
+            st.sidebar.success("✅ Alzheimer's model loaded")
+        else:
+            st.sidebar.info("ℹ️ Alzheimer's model not found")
+    except Exception as e:
+        st.sidebar.warning(f"⚠️ Alzheimer's model error: {str(e)[:50]}...")
+    
+    try:
+        # Load Alzheimer's scaler
+        alzheimer_scaler_path = Path("models/alzheimer_scaler.joblib")
+        if alzheimer_scaler_path.exists():
+            scalers['alzheimer'] = joblib.load(alzheimer_scaler_path)
+    except Exception as e:
+        pass
+    
+    try:
+        # Load Prostate model (NEW FILENAME)
+        prostate_model_path = Path("models/prostate_rf_model_2000f_70_30.joblib")
+        if prostate_model_path.exists():
+            models['prostate'] = joblib.load(prostate_model_path)
+            st.sidebar.success("✅ Prostate model loaded")
+        else:
+            st.sidebar.info("ℹ️ Prostate model not found")
+    except Exception as e:
+        st.sidebar.error(f"❌ Prostate model error: {str(e)[:50]}...")
+    
+    try:
+        # Load Prostate scaler (NEW FILENAME)
+        prostate_scaler_path = Path("models/prostate_rf_scaler_2000f_70_30.joblib")
+        if prostate_scaler_path.exists():
+            scalers['prostate'] = joblib.load(prostate_scaler_path)
+    except Exception as e:
+        pass
+    
+    return models, scalers
+
+# Function to prepare data for prediction
+def prepare_data_for_prediction(df, model, scaler=None):
+    """Prepare uploaded data to match model's expected features"""
+    try:
+        # Remove non-numeric columns (like SampleID)
+        numeric_df = df.select_dtypes(include=[np.number])
+        
+        # If no numeric columns, try converting
+        if numeric_df.empty:
+            # Try to convert all columns except first (assumed to be ID)
+            df_copy = df.iloc[:, 1:].copy()
+            for col in df_copy.columns:
+                df_copy[col] = pd.to_numeric(df_copy[col], errors='coerce')
+            numeric_df = df_copy.select_dtypes(include=[np.number])
+        
+        # Get model's expected features
+        if hasattr(model, 'feature_names_in_'):
+            expected_features = model.feature_names_in_
+            
+            # Align columns with model's expected features
+            missing_cols = set(expected_features) - set(numeric_df.columns)
+            extra_cols = set(numeric_df.columns) - set(expected_features)
+            
+            if missing_cols:
+                st.warning(f"⚠️ Missing {len(missing_cols)} expected features. Filling with zeros.")
+                for col in missing_cols:
+                    numeric_df[col] = 0
+            
+            if extra_cols:
+                st.info(f"ℹ️ {len(extra_cols)} extra columns will be ignored.")
+            
+            # Reorder columns to match model
+            numeric_df = numeric_df[expected_features]
+        
+        # Apply scaling if scaler exists
+        if scaler is not None:
+            numeric_df = pd.DataFrame(
+                scaler.transform(numeric_df),
+                columns=numeric_df.columns,
+                index=numeric_df.index
+            )
+        
+        return numeric_df
+    
+    except Exception as e:
+        st.error(f"Error preparing data: {str(e)}")
+        return None
 
 # Function to extract text from PDF
 def extract_text_from_pdf(pdf_file):
@@ -162,9 +263,22 @@ def convert_to_dataframe(uploaded_file):
 st.markdown('<h1 class="main-header">🧬 Epigenetic Disease Prediction System</h1>', unsafe_allow_html=True)
 st.markdown('<p class="sub-header">Predict disease risk using epigenetic methylation data</p>', unsafe_allow_html=True)
 
+# Load models
+models, scalers = load_models()
+
 # Sidebar
 with st.sidebar:
-    st.image("https://via.placeholder.com/300x100/1E88E5/ffffff?text=Epigenetic+Predictor", width="stretch")
+    # Try to load local image, fallback to a simple colored placeholder
+    try:
+        st.image("assets/dna_logo.png", width="stretch")
+    except:
+        st.markdown("""
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 20px;">
+                <h2 style="color: white; margin: 0;">🧬 Epigenetic<br>Predictor</h2>
+            </div>
+        """, unsafe_allow_html=True)
+    
     st.markdown("### 🎯 Model Selection")
     
     disease_type = st.selectbox(
@@ -177,18 +291,20 @@ with st.sidebar:
     st.markdown("### 📊 Model Information")
     
     if disease_type == "Alzheimer's Disease":
-        st.info("""
+        model_available = 'alzheimer' in models
+        st.info(f"""
         **Dataset:** GSE80970  
         **Model:** Random Forest  
-        **Accuracy:** ~90%  
+        **Status:** {'✅ Loaded' if model_available else '❌ Not Loaded'}  
         **Features:** DNA Methylation Sites
         """)
     else:
-        st.info("""
+        model_available = 'prostate' in models
+        st.info(f"""
         **Dataset:** GSE26126  
-        **Model:** Random Forest  
-        **Accuracy:** ~88%  
-        **Features:** DNA Methylation Sites
+        **Model:** Random Forest (2000 features)
+        **Status:** {'✅ Loaded' if model_available else '❌ Not Loaded'}  
+        **Split:** 70/30 Train/Test
         """)
     
     st.markdown("---")
@@ -291,41 +407,73 @@ st.markdown("### 🔮 Make Prediction")
 
 if df is not None:
     if st.button("🚀 Predict Disease Status", type="primary", width="stretch"):
-        with st.spinner("🧬 Analyzing epigenetic data..."):
-            # Placeholder for actual prediction logic
-            import time
-            time.sleep(2)  # Simulate processing
-            
-            # TODO: Replace with actual model prediction
-            # For now, using dummy prediction
-            import random
-            prediction = random.choice([0, 1])  # 0 = Control, 1 = Disease
-            confidence = random.uniform(0.75, 0.95)
-            
-            st.markdown("### 📊 Prediction Results")
-            
-            if prediction == 0:
-                st.markdown(f"""
-                <div class="prediction-box control">
-                    <h2>✅ Control (Healthy)</h2>
-                    <p style="font-size: 1.2rem;">Confidence: {confidence:.2%}</p>
-                    <p>The model predicts this sample as <strong>Control/Healthy</strong> for {disease_type}.</p>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div class="prediction-box disease">
-                    <h2>⚠️ Disease Detected</h2>
-                    <p style="font-size: 1.2rem;">Confidence: {confidence:.2%}</p>
-                    <p>The model predicts this sample shows signs of <strong>{disease_type}</strong>.</p>
-                    <p><em>⚠️ This is a computational prediction. Please consult healthcare professionals for diagnosis.</em></p>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            # Feature importance visualization placeholder
-            with st.expander("📈 Top Contributing CpG Sites"):
-                st.info("Feature importance visualization will be added here")
-                # TODO: Add SHAP values or feature importance chart
+        # Select the appropriate model
+        model_key = 'alzheimer' if disease_type == "Alzheimer's Disease" else 'prostate'
+        
+        if model_key not in models:
+            st.error(f"❌ {disease_type} model is not loaded. Please check the models folder.")
+        else:
+            with st.spinner("🧬 Analyzing epigenetic data..."):
+                try:
+                    # Get model and scaler
+                    model = models[model_key]
+                    scaler = scalers.get(model_key, None)
+                    
+                    # Prepare data
+                    prepared_data = prepare_data_for_prediction(df, model, scaler)
+                    
+                    if prepared_data is not None:
+                        # Make predictions
+                        predictions = model.predict(prepared_data)
+                        
+                        # Get prediction probabilities if available
+                        if hasattr(model, 'predict_proba'):
+                            probabilities = model.predict_proba(prepared_data)
+                            confidence = probabilities.max(axis=1)
+                        else:
+                            confidence = np.ones(len(predictions)) * 0.85
+                        
+                        st.markdown("### 📊 Prediction Results")
+                        
+                        # Display results for each sample
+                        for idx, (pred, conf) in enumerate(zip(predictions, confidence)):
+                            sample_name = df.iloc[idx, 0] if df.shape[1] > 0 else f"Sample {idx+1}"
+                            
+                            if pred == 0:
+                                st.markdown(f"""
+                                <div class="prediction-box control">
+                                    <h3>{sample_name}</h3>
+                                    <h2>✅ Control (Healthy)</h2>
+                                    <p style="font-size: 1.2rem;">Confidence: {conf:.2%}</p>
+                                    <p>The model predicts this sample as <strong>Control/Healthy</strong> for {disease_type}.</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            else:
+                                st.markdown(f"""
+                                <div class="prediction-box disease">
+                                    <h3>{sample_name}</h3>
+                                    <h2>⚠️ Disease Detected</h2>
+                                    <p style="font-size: 1.2rem;">Confidence: {conf:.2%}</p>
+                                    <p>The model predicts this sample shows signs of <strong>{disease_type}</strong>.</p>
+                                    <p><em>⚠️ This is a computational prediction. Please consult healthcare professionals for diagnosis.</em></p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                        
+                        # Feature importance visualization
+                        with st.expander("📈 Top Contributing CpG Sites"):
+                            if hasattr(model, 'feature_importances_'):
+                                feature_importance = pd.DataFrame({
+                                    'Feature': prepared_data.columns,
+                                    'Importance': model.feature_importances_
+                                }).sort_values('Importance', ascending=False).head(10)
+                                
+                                st.bar_chart(feature_importance.set_index('Feature'))
+                            else:
+                                st.info("Feature importance not available for this model type")
+                    
+                except Exception as e:
+                    st.error(f"❌ Prediction error: {str(e)}")
+                    st.info("Please ensure your data format matches the model's requirements.")
 else:
     st.warning("⚠️ Please upload a file first to enable prediction")
 

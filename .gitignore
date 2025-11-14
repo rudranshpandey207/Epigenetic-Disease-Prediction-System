@@ -67,3 +67,6 @@ credentials.json
 # --- OS Specific ---
 Thumbs.db
 desktop.ini
+
+# --- Testing Files ---
+test/
