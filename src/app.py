@@ -337,6 +337,13 @@ def extract_text_from_image(image_file):
 # Function to parse text to DataFrame
 def parse_text_to_dataframe(text):
     try:
+        # Clean common OCR and encoding errors
+        # Replace cent symbol (¢) with 'c' - common OCR error
+        text = text.replace('\u00a2g', 'cg')  # ¢g -> cg
+        text = text.replace('\u00a2G', 'cG')  # ¢G -> cG
+        text = text.replace('¢g', 'cg')       # Alternative encoding
+        text = text.replace('¢G', 'cG')
+        
         # Split by lines
         lines = text.strip().split('\n')
         
@@ -694,7 +701,7 @@ else:
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #666; padding: 2rem;">
-    <p>🔬 Developed by Rudransh Pandey | 🧬 Powered by Machine Learning & Bioinformatics</p>
+    <p>🔬 Developed by Rudransh Pandey,Ishan Mittal,Himangi Rawat | 🧬 Powered by Machine Learning & Bioinformatics</p>
     <p>⚠️ <strong>Disclaimer:</strong> This tool is for research purposes only. Not for clinical diagnosis.</p>
 </div>
 """, unsafe_allow_html=True)
