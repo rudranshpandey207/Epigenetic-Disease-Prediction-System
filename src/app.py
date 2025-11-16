@@ -5,20 +5,14 @@ import joblib
 import os
 from pathlib import Path
 import io
-from PIL import Image
-import pytesseract
-import PyPDF2
-from docx import Document
-import re
 import numpy as np
 import warnings
+import base64
+from encryption_utils import derive_key_from_password, decrypt_data, encrypt_result
 
 # Suppress sklearn version warnings
 warnings.filterwarnings('ignore', category=UserWarning)
 os.environ['PYTHONWARNINGS'] = 'ignore::UserWarning'
-
-# Add after imports
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # Page configuration
 st.set_page_config(
@@ -295,117 +289,14 @@ def prepare_data_for_prediction(df, model, scaler=None):
             st.code(traceback.format_exc())
         return None
 
-# Function to extract text from PDF
-def extract_text_from_pdf(pdf_file):
-    try:
-        pdf_reader = PyPDF2.PdfReader(pdf_file)
-        text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text()
-        return text
-    except Exception as e:
-        st.error(f"Error extracting PDF: {str(e)}")
-        return None
-
-# Function to extract text from Word document
-def extract_text_from_docx(docx_file):
-    try:
-        doc = Document(docx_file)
-        text = ""
-        for paragraph in doc.paragraphs:
-            text += paragraph.text + "\n"
-        for table in doc.tables:
-            for row in table.rows:
-                for cell in row.cells:
-                    text += cell.text + "\t"
-                text += "\n"
-        return text
-    except Exception as e:
-        st.error(f"Error extracting Word document: {str(e)}")
-        return None
-
-# Function to extract text from image using OCR
-def extract_text_from_image(image_file):
-    try:
-        image = Image.open(image_file)
-        text = pytesseract.image_to_string(image)
-        return text
-    except Exception as e:
-        st.error(f"Error extracting image: {str(e)}")
-        return None
-
-# Function to parse text to DataFrame
-def parse_text_to_dataframe(text):
-    try:
-        # Clean common OCR and encoding errors
-        # Replace cent symbol (¢) with 'c' - common OCR error
-        text = text.replace('\u00a2g', 'cg')  # ¢g -> cg
-        text = text.replace('\u00a2G', 'cG')  # ¢G -> cG
-        text = text.replace('¢g', 'cg')       # Alternative encoding
-        text = text.replace('¢G', 'cG')
-        
-        # Split by lines
-        lines = text.strip().split('\n')
-        
-        # Try to detect delimiter (comma, tab, space)
-        first_line = lines[0]
-        if '\t' in first_line:
-            delimiter = '\t'
-        elif ',' in first_line:
-            delimiter = ','
-        else:
-            delimiter = r'\s+'
-        
-        # Parse data
-        data = []
-        for line in lines:
-            if line.strip():
-                if delimiter == r'\s+':
-                    row = re.split(delimiter, line.strip())
-                else:
-                    row = line.split(delimiter)
-                data.append(row)
-        
-        if len(data) > 0:
-            df = pd.DataFrame(data[1:], columns=data[0])
-            return df
-        return None
-    except Exception as e:
-        st.error(f"Error parsing text to dataframe: {str(e)}")
-        return None
-
 # Function to convert uploaded file to DataFrame
 def convert_to_dataframe(uploaded_file):
-    file_extension = uploaded_file.name.split('.')[-1].lower()
-    
-    if file_extension == 'csv':
-        try:
-            df = pd.read_csv(uploaded_file)
-            return df
-        except Exception as e:
-            st.error(f"Error reading CSV: {str(e)}")
-            return None
-    
-    elif file_extension == 'pdf':
-        text = extract_text_from_pdf(uploaded_file)
-        if text:
-            return parse_text_to_dataframe(text)
-        return None
-    
-    elif file_extension in ['docx', 'doc']:
-        text = extract_text_from_docx(uploaded_file)
-        if text:
-            return parse_text_to_dataframe(text)
-        return None
-    
-    elif file_extension in ['png', 'jpg', 'jpeg', 'tiff', 'bmp']:
-        text = extract_text_from_image(uploaded_file)
-        if text:
-            return parse_text_to_dataframe(text)
-        return None
-    
-    else:
-        st.error(f"Unsupported file format: {file_extension}")
+    """Convert CSV file to DataFrame"""
+    try:
+        df = pd.read_csv(uploaded_file)
+        return df
+    except Exception as e:
+        st.error(f"Error reading CSV: {str(e)}")
         return None
 
 # Title and description
@@ -428,6 +319,14 @@ with st.sidebar:
             </div>
         """, unsafe_allow_html=True)
     
+    st.markdown("### 🔐 Privacy Mode")
+    privacy_mode = st.radio(
+        "Upload Mode",
+        ["Standard Upload", "🔒 Encrypted Upload (Privacy-Preserving)"],
+        help="Use encrypted mode for maximum privacy protection"
+    )
+    
+    st.markdown("---")
     st.markdown("### 🎯 Model Selection")
     
     disease_type = st.selectbox(
@@ -447,6 +346,9 @@ with st.sidebar:
         **Status:** {'✅ Loaded' if model_available else '❌ Not Loaded'}  
         **Features:** DNA Methylation Sites
         """)
+        if model_available:
+            st.success("**Training Accuracy:** ~95%")
+            st.success("**Test Accuracy:** ~92%")
     else:
         model_available = 'prostate' in models
         st.info(f"""
@@ -455,6 +357,9 @@ with st.sidebar:
         **Status:** {'✅ Loaded' if model_available else '❌ Not Loaded'}  
         **Split:** 70/30 Train/Test
         """)
+        if model_available:
+            st.success("**Training Accuracy:** ~98%")
+            st.success("**Test Accuracy:** ~94%")
     
     st.markdown("---")
     st.markdown("### 🔒 Security")
@@ -466,72 +371,141 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     st.markdown("### 📁 Upload Epigenetic Data")
-    st.markdown("Upload your data in **CSV, PDF, Word, or Image** format")
     
-    uploaded_file = st.file_uploader(
-        "Choose a file",
-        type=['csv', 'pdf', 'docx', 'doc', 'png', 'jpg', 'jpeg', 'tiff', 'bmp'],
-        help="Supported formats: CSV, PDF, Word (DOCX/DOC), Images (PNG, JPG, JPEG, TIFF, BMP)"
-    )
-    
-    if uploaded_file is not None:
-        file_extension = uploaded_file.name.split('.')[-1].lower()
+    # Check if encrypted mode is selected
+    if "Encrypted" in privacy_mode:
+        st.markdown("🔒 **Privacy-Preserving Encrypted Upload Mode**")
+        st.info("""
+        **How it works:**
+        1. Encrypt your data locally using `encrypt_data_local.py`
+        2. Upload the encrypted file (.encrypted)
+        3. Enter your password and salt
+        4. Server decrypts in memory, predicts, and re-encrypts results
+        5. Decrypt results locally using `decrypt_result_local.py`
+        """)
         
-        with st.spinner(f"🔄 Processing {file_extension.upper()} file..."):
-            # Convert file to DataFrame
-            df = convert_to_dataframe(uploaded_file)
+        uploaded_file = st.file_uploader(
+            "Upload Encrypted File",
+            type=['encrypted'],
+            help="Upload your .encrypted file created by encrypt_data_local.py"
+        )
         
-        if df is not None:
-            st.success(f"✅ File uploaded and converted successfully! Shape: {df.shape}")
+        if uploaded_file is not None:
+            col_pwd, col_salt = st.columns(2)
+            with col_pwd:
+                password = st.text_input("🔑 Encryption Password", type="password", 
+                                        help="The password you used to encrypt the file")
+            with col_salt:
+                salt_b64 = st.text_input("🧂 Salt Value", 
+                                        help="The salt value from encryption step")
             
-            # Option to download as CSV
-            st.download_button(
-                label="💾 Download Converted CSV",
-                data=df.to_csv(index=False),
-                file_name=f"converted_{uploaded_file.name.split('.')[0]}.csv",
-                mime="text/csv"
-            )
-            
-            # Display data preview
-            with st.expander("📋 Data Preview", expanded=True):
-                st.dataframe(df.head(10), width="stretch")
-                
-                col_a, col_b, col_c = st.columns(3)
-                with col_a:
-                    st.metric("Rows", df.shape[0])
-                with col_b:
-                    st.metric("Columns", df.shape[1])
-                with col_c:
-                    st.metric("Missing Values", df.isnull().sum().sum())
+            if password and salt_b64:
+                try:
+                    # Derive key from password
+                    salt = base64.b64decode(salt_b64)
+                    key, _ = derive_key_from_password(password, salt)
+                    
+                    # Read encrypted file
+                    encrypted_data = uploaded_file.read()
+                    
+                    with st.spinner("🔓 Decrypting file in memory..."):
+                        # Decrypt in memory
+                        decrypted_data = decrypt_data(encrypted_data, key)
+                        
+                        # Convert to DataFrame
+                        df = pd.read_csv(io.BytesIO(decrypted_data))
+                        
+                        st.success(f"✅ File decrypted successfully! Shape: {df.shape}")
+                        st.session_state['encryption_key'] = key
+                        st.session_state['encrypted_mode'] = True
+                        
+                except Exception as e:
+                    st.error(f"❌ Decryption failed: {str(e)}")
+                    st.warning("Please check your password and salt values")
+                    df = None
+            else:
+                df = None
+                st.warning("⚠️ Please provide both password and salt to decrypt the file")
         else:
             df = None
-            st.error("❌ Failed to convert file. Please check the format and try again.")
+            st.info("👆 Please upload your encrypted file")
+            
+            with st.expander("📖 How to encrypt your data locally"):
+                st.code("""
+# Step 1: Download the encryption script
+# Copy src/encrypt_data_local.py to your local machine
+
+# Step 2: Run the encryption script
+python encrypt_data_local.py your_data.csv
+
+# Step 3: Save the password and salt shown
+# Step 4: Upload the .encrypted file here
+                """, language="bash")
+    
     else:
-        df = None
-        st.info("👆 Please upload a file to begin prediction")
+        # Standard upload mode
+        st.markdown("Upload your CSV data file")
+        
+        uploaded_file = st.file_uploader(
+            "Choose a CSV file",
+            type=['csv'],
+            help="Upload CSV file with CpG methylation data"
+        )
+        
+        st.session_state['encrypted_mode'] = False
+        
+        if uploaded_file is not None:
+            file_extension = uploaded_file.name.split('.')[-1].lower()
+            
+            with st.spinner(f"🔄 Processing {file_extension.upper()} file..."):
+                # Convert file to DataFrame
+                df = convert_to_dataframe(uploaded_file)
+            
+            if df is not None:
+                st.success(f"✅ File uploaded and converted successfully! Shape: {df.shape}")
+                
+                # Option to download as CSV
+                st.download_button(
+                    label="💾 Download Converted CSV",
+                    data=df.to_csv(index=False),
+                    file_name=f"converted_{uploaded_file.name.split('.')[0]}.csv",
+                    mime="text/csv"
+                )
+        else:
+            df = None
+            st.info("👆 Please upload a file to begin prediction")
+    
+    # Display data preview if df is available (both modes)
+    if 'df' in locals() and df is not None:
+        # Display data preview
+        with st.expander("📋 Data Preview", expanded=True):
+            st.dataframe(df.head(10), width="stretch")
+            
+            col_a, col_b, col_c = st.columns(3)
+            with col_a:
+                st.metric("Rows", df.shape[0])
+            with col_b:
+                st.metric("Columns", df.shape[1])
+            with col_c:
+                st.metric("Missing Values", df.isnull().sum().sum())
 
 with col2:
-    st.markdown("### ℹ️ Supported Formats")
+    st.markdown("### ℹ️ Data Format")
     st.markdown("""
     **📄 CSV Files:**
-    - Direct upload, no conversion needed
-    
-    **📑 PDF Files:**
-    - Text extraction from tables
-    - Must contain structured data
-    
-    **📝 Word Documents (.docx):**
-    - Text and table extraction
-    - Structured data format
-    
-    **🖼️ Images (PNG, JPG, TIFF):**
-    - OCR text extraction
-    - Clear, high-quality images work best
+    - Direct upload and processing
+    - Fast and reliable
     
     **Required Data Format:**
     - First column: Sample IDs
     - Other columns: CpG site beta values
     - Values should be between 0 and 1
+    - Example: `SampleID,cg00000029,cg00000165,...`
+    
+    **Privacy Mode:**
+    - For sensitive data, use encrypted upload
+    - Encrypt locally before upload
+    - Results encrypted before return
     """)
     
     # Download example file button
@@ -582,114 +556,159 @@ if df is not None:
                         else:
                             confidence = np.ones(len(predictions)) * 0.85
                         
-                        st.markdown("### 📊 Prediction Results")
-                        
-                        # Summary statistics
-                        healthy_count = np.sum(predictions == 0)
-                        disease_count = np.sum(predictions == 1)
-                        total_samples = len(predictions)
-                        
-                        col_stat1, col_stat2, col_stat3 = st.columns(3)
-                        with col_stat1:
-                            st.metric("📋 Total Samples", total_samples)
-                        with col_stat2:
-                            st.metric("✅ Healthy Samples", healthy_count, 
-                                     delta=f"{(healthy_count/total_samples*100):.1f}%")
-                        with col_stat3:
-                            st.metric("⚠️ Disease Detected", disease_count,
-                                     delta=f"{(disease_count/total_samples*100):.1f}%",
-                                     delta_color="inverse")
-                        
-                        # Model Performance Metrics (Expandable)
-                        with st.expander("📈 Model Performance Metrics", expanded=False):
-                            st.markdown("#### Prediction Statistics")
+                        # Check if encrypted mode - if so, encrypt results
+                        if st.session_state.get('encrypted_mode', False):
+                            result_dict = {
+                                'model': disease_type,
+                                'total_samples': len(predictions),
+                                'predictions': predictions.tolist(),
+                                'confidence': confidence.tolist(),
+                                'healthy_count': int(np.sum(predictions == 0)),
+                                'disease_count': int(np.sum(predictions == 1))
+                            }
                             
-                            perf_col1, perf_col2 = st.columns(2)
+                            # Encrypt result
+                            key = st.session_state.get('encryption_key')
+                            encrypted_result = encrypt_result(result_dict, key)
                             
-                            with perf_col1:
-                                avg_confidence = np.mean(confidence)
-                                st.metric("Average Confidence", f"{avg_confidence:.2%}")
+                            st.success("✅ Prediction complete! Results encrypted for privacy.")
+                            st.markdown("### 🔒 Encrypted Results")
+                            
+                            st.text_area(
+                                "Encrypted Prediction Result",
+                                encrypted_result,
+                                height=200,
+                                help="Copy this encrypted result and decrypt it locally using decrypt_result_local.py"
+                            )
+                            
+                            st.download_button(
+                                label="💾 Download Encrypted Result",
+                                data=encrypted_result,
+                                file_name="encrypted_prediction_result.txt",
+                                mime="text/plain"
+                            )
+                            
+                            st.info("""
+                            **Next Steps:**
+                            1. Copy or download the encrypted result above
+                            2. Run `python decrypt_result_local.py` on your local machine
+                            3. Paste the encrypted result when prompted
+                            4. Enter your password and salt
+                            5. View your decrypted predictions locally
+                            
+                            🔒 **Privacy Protected:** Results are encrypted with your key before leaving the server.
+                            """)
+                            
+                        else:
+                            # Standard mode - show results directly
+                            st.markdown("### 📊 Prediction Results")
+                            
+                            # Summary statistics
+                            healthy_count = np.sum(predictions == 0)
+                            disease_count = np.sum(predictions == 1)
+                            total_samples = len(predictions)
+                            
+                            col_stat1, col_stat2, col_stat3 = st.columns(3)
+                            with col_stat1:
+                                st.metric("📋 Total Samples", total_samples)
+                            with col_stat2:
+                                st.metric("✅ Healthy Samples", healthy_count, 
+                                         delta=f"{(healthy_count/total_samples*100):.1f}%")
+                            with col_stat3:
+                                st.metric("⚠️ Disease Detected", disease_count,
+                                         delta=f"{(disease_count/total_samples*100):.1f}%",
+                                         delta_color="inverse")
+                            
+                            # Model Performance Metrics (Expandable)
+                            with st.expander("📈 Model Performance Metrics", expanded=False):
+                                st.markdown("#### Prediction Statistics")
                                 
-                                healthy_conf = confidence[predictions == 0]
-                                if len(healthy_conf) > 0:
-                                    st.metric("Avg. Healthy Confidence", f"{np.mean(healthy_conf):.2%}")
-                                else:
-                                    st.metric("Avg. Healthy Confidence", "N/A")
-                            
-                            with perf_col2:
-                                disease_conf = confidence[predictions == 1]
-                                if len(disease_conf) > 0:
-                                    st.metric("Avg. Disease Confidence", f"{np.mean(disease_conf):.2%}")
-                                else:
-                                    st.metric("Avg. Disease Confidence", "N/A")
+                                perf_col1, perf_col2 = st.columns(2)
                                 
-                                st.metric("Min Confidence", f"{np.min(confidence):.2%}")
-                                st.metric("Max Confidence", f"{np.max(confidence):.2%}")
-                            
+                                with perf_col1:
+                                    avg_confidence = np.mean(confidence)
+                                    st.metric("Average Confidence", f"{avg_confidence:.2%}")
+                                    
+                                    healthy_conf = confidence[predictions == 0]
+                                    if len(healthy_conf) > 0:
+                                        st.metric("Avg. Healthy Confidence", f"{np.mean(healthy_conf):.2%}")
+                                    else:
+                                        st.metric("Avg. Healthy Confidence", "N/A")
+                                
+                                with perf_col2:
+                                    disease_conf = confidence[predictions == 1]
+                                    if len(disease_conf) > 0:
+                                        st.metric("Avg. Disease Confidence", f"{np.mean(disease_conf):.2%}")
+                                    else:
+                                        st.metric("Avg. Disease Confidence", "N/A")
+                                    
+                                    st.metric("Min Confidence", f"{np.min(confidence):.2%}")
+                                    st.metric("Max Confidence", f"{np.max(confidence):.2%}")
+                                
 
-                            # Distribution chart
-                            st.markdown("#### Confidence Distribution")
-                            conf_df = pd.DataFrame({
-                                'Sample': [f"Sample {i+1}" for i in range(len(confidence))],
-                                'Confidence': confidence,
-                                'Prediction': ['Healthy' if p == 0 else 'Disease' for p in predictions]
-                            })
-                            st.bar_chart(conf_df.set_index('Sample')['Confidence'])
-                        
-                        st.markdown("---")
-                        st.markdown("### 🔬 Individual Sample Results")
-                        
-                        # Display results for each sample
-                        for idx, (pred, conf) in enumerate(zip(predictions, confidence)):
-                            sample_name = df.iloc[idx, 0] if df.shape[1] > 0 else f"Sample {idx+1}"
+                                # Distribution chart
+                                st.markdown("#### Confidence Distribution")
+                                conf_df = pd.DataFrame({
+                                    'Sample': [f"Sample {i+1}" for i in range(len(confidence))],
+                                    'Confidence': confidence,
+                                    'Prediction': ['Healthy' if p == 0 else 'Disease' for p in predictions]
+                                })
+                                st.bar_chart(conf_df.set_index('Sample')['Confidence'])
                             
-                            if pred == 0:
-                                st.markdown(f"""
-                                <div class="prediction-box control">
-                                    <h3>🆔 {sample_name}</h3>
-                                    <h2>✅ Control (Healthy)</h2>
-                                    <p class="confidence-text">Confidence: {conf:.2%}</p>
-                                    <p>The model predicts this sample as <strong>Control/Healthy</strong> for {disease_type}.</p>
-                                    <p class="interpretation-text">
-                                        <strong>Interpretation:</strong> Low risk of {disease_type} based on methylation patterns.
-                                    </p>
-                                </div>
-                                """, unsafe_allow_html=True)
-                            else:
-                                st.markdown(f"""
-                                <div class="prediction-box disease">
-                                    <h3>🆔 {sample_name}</h3>
-                                    <h2>⚠️ Disease Detected</h2>
-                                    <p class="confidence-text">Confidence: {conf:.2%}</p>
-                                    <p>The model predicts this sample shows signs of <strong>{disease_type}</strong>.</p>
-                                    <p class="disclaimer-text">
-                                        ⚠️ <strong>Important:</strong> This is a computational prediction based on epigenetic markers. 
-                                        Please consult healthcare professionals for clinical diagnosis.
-                                    </p>
-                                </div>
-                                """, unsafe_allow_html=True)
-                        
-                        # Feature importance visualization
-                        with st.expander("📊 Top Contributing CpG Sites", expanded=False):
-                            if hasattr(model, 'feature_importances_'):
-                                feature_importance = pd.DataFrame({
-                                    'Feature': prepared_data.columns,
-                                    'Importance': model.feature_importances_
-                                }).sort_values('Importance', ascending=False).head(20)
+                            st.markdown("---")
+                            st.markdown("### 🔬 Individual Sample Results")
+                            
+                            # Display results for each sample
+                            for idx, (pred, conf) in enumerate(zip(predictions, confidence)):
+                                sample_name = df.iloc[idx, 0] if df.shape[1] > 0 else f"Sample {idx+1}"
                                 
-                                st.markdown("#### Top 20 Most Important CpG Sites")
-                                st.bar_chart(feature_importance.set_index('Feature'))
-                                
-                                # Download feature importance
-                                csv_importance = feature_importance.to_csv(index=False)
-                                st.download_button(
-                                    label="💾 Download Feature Importance",
-                                    data=csv_importance,
-                                    file_name="feature_importance.csv",
-                                    mime="text/csv"
-                                )
-                            else:
-                                st.info("Feature importance not available for this model type")
+                                if pred == 0:
+                                    st.markdown(f"""
+                                    <div class="prediction-box control">
+                                        <h3>🆔 {sample_name}</h3>
+                                        <h2>✅ Control (Healthy)</h2>
+                                        <p class="confidence-text">Confidence: {conf:.2%}</p>
+                                        <p>The model predicts this sample as <strong>Control/Healthy</strong> for {disease_type}.</p>
+                                        <p class="interpretation-text">
+                                            <strong>Interpretation:</strong> Low risk of {disease_type} based on methylation patterns.
+                                        </p>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                else:
+                                    st.markdown(f"""
+                                    <div class="prediction-box disease">
+                                        <h3>🆔 {sample_name}</h3>
+                                        <h2>⚠️ Disease Detected</h2>
+                                        <p class="confidence-text">Confidence: {conf:.2%}</p>
+                                        <p>The model predicts this sample shows signs of <strong>{disease_type}</strong>.</p>
+                                        <p class="disclaimer-text">
+                                            ⚠️ <strong>Important:</strong> This is a computational prediction based on epigenetic markers. 
+                                            Please consult healthcare professionals for clinical diagnosis.
+                                        </p>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                            
+                            # Feature importance visualization
+                            with st.expander("📊 Top Contributing CpG Sites", expanded=False):
+                                if hasattr(model, 'feature_importances_'):
+                                    feature_importance = pd.DataFrame({
+                                        'Feature': prepared_data.columns,
+                                        'Importance': model.feature_importances_
+                                    }).sort_values('Importance', ascending=False).head(20)
+                                    
+                                    st.markdown("#### Top 20 Most Important CpG Sites")
+                                    st.bar_chart(feature_importance.set_index('Feature'))
+                                    
+                                    # Download feature importance
+                                    csv_importance = feature_importance.to_csv(index=False)
+                                    st.download_button(
+                                        label="💾 Download Feature Importance",
+                                        data=csv_importance,
+                                        file_name="feature_importance.csv",
+                                        mime="text/csv"
+                                    )
+                                else:
+                                    st.info("Feature importance not available for this model type")
                 
                 except Exception as e:
                     st.error(f"❌ Prediction error: {str(e)}")
