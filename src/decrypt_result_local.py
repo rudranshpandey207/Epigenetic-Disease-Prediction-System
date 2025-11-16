@@ -106,13 +106,39 @@ def main():
     print("=" * 60)
     print()
     
-    # Get encrypted result
+    # Get encrypted result - allow file or direct input
     if len(sys.argv) < 2:
-        print("Enter the encrypted result from the Streamlit app:")
-        print("(Paste the entire encrypted string, then press Enter)")
-        encrypted_result = input("> ").strip()
+        print("Choose input method:")
+        print("1. Paste encrypted result string")
+        print("2. Load from file")
+        choice = input("\nEnter choice (1 or 2): ").strip()
+        
+        if choice == "2":
+            file_path = input("Enter path to encrypted result file: ").strip()
+            try:
+                with open(file_path, 'r') as f:
+                    encrypted_result = f.read().strip()
+                print(f"✅ Loaded encrypted result from: {file_path}")
+            except Exception as e:
+                print(f"❌ Error reading file: {str(e)}")
+                sys.exit(1)
+        else:
+            print("\nEnter the encrypted result from the Streamlit app:")
+            print("(Paste the entire encrypted string, then press Enter)")
+            encrypted_result = input("> ").strip()
     else:
-        encrypted_result = sys.argv[1]
+        # Check if argument is a file path
+        arg = sys.argv[1]
+        if arg.endswith('.txt') or '/' in arg or '\\' in arg:
+            try:
+                with open(arg, 'r') as f:
+                    encrypted_result = f.read().strip()
+                print(f"✅ Loaded encrypted result from: {arg}")
+            except Exception as e:
+                print(f"❌ Error reading file: {str(e)}")
+                sys.exit(1)
+        else:
+            encrypted_result = arg
     
     if not encrypted_result:
         print("❌ Error: No encrypted result provided!")
