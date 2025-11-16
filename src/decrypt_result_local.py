@@ -159,15 +159,52 @@ def main():
         result = decrypt_prediction_result(encrypted_result, password, salt_b64)
         format_prediction_result(result)
         
-        # Ask if user wants to save results
+        # Automatically save detailed results to results.json
         print()
-        save = input("💾 Save decrypted results to file? (y/n): ").strip().lower()
-        if save == 'y':
-            import json
-            output_file = input("Enter output filename (default: results.json): ").strip() or "results.json"
+        print("💾 Saving detailed results to results.json...")
+        
+        # Create detailed output with sample-by-sample results
+        import json
+        
+        predictions = result.get('predictions', [])
+        confidence_scores = result.get('confidence', [])
+        
+        detailed_results = {
+            'model': result.get('model', 'Unknown'),
+            'total_samples': result.get('total_samples', 0),
+            'summary': {
+                'healthy_count': result.get('healthy_count', 0),
+                'disease_count': result.get('disease_count', 0),
+                'disease_rate': f"{(result.get('disease_count', 0) / result.get('total_samples', 1) * 100):.1f}%"
+            },
+            'sample_results': []
+        }
+        
+        # Add individual sample results
+        for i, pred in enumerate(predictions, 1):
+            sample_result = {
+                'sample_number': i,
+                'prediction': 'Healthy' if pred == 0 else 'Disease',
+                'prediction_code': int(pred),
+                'confidence': f"{confidence_scores[i-1]:.4f}" if confidence_scores and i-1 < len(confidence_scores) else "N/A"
+            }
+            detailed_results['sample_results'].append(sample_result)
+        
+        # Save to results.json
+        with open('results.json', 'w') as f:
+            json.dump(detailed_results, f, indent=2)
+        
+        print(f"✅ Detailed results saved to results.json")
+        print(f"   - {len(predictions)} samples with predictions and confidence scores")
+        
+        # Ask if user wants to save to custom location too
+        print()
+        save_custom = input("💾 Save to additional file? (y/n): ").strip().lower()
+        if save_custom == 'y':
+            output_file = input("Enter output filename: ").strip()
             with open(output_file, 'w') as f:
-                json.dump(result, f, indent=2)
-            print(f"✅ Results saved to {output_file}")
+                json.dump(detailed_results, f, indent=2)
+            print(f"✅ Results also saved to {output_file}")
         
         print()
         print("🔒 Your data remains private - results decrypted locally!")
