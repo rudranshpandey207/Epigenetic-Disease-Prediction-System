@@ -58,8 +58,8 @@ def format_prediction_result(result: dict):
     elif 'Alzheimer' in model_name:
         print("🎯 MODEL ACCURACY")
         print("-" * 60)
-        print("Training Accuracy: ~95%")
-        print("Test Accuracy: ~92%")
+        print("Training Accuracy: ~82%")
+        print("Test Accuracy: ~80%")
         print()
     
     print("-" * 60)

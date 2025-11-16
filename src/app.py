@@ -347,8 +347,8 @@ with st.sidebar:
         **Features:** DNA Methylation Sites
         """)
         if model_available:
-            st.success("**Training Accuracy:** ~95%")
-            st.success("**Test Accuracy:** ~92%")
+            st.success("**Training Accuracy:** ~82%")
+            st.success("**Test Accuracy:** ~80%")
     else:
         model_available = 'prostate' in models
         st.info(f"""
