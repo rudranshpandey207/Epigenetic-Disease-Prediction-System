@@ -132,7 +132,7 @@ def load_models():
     
     try:
         # Load Alzheimer's model
-        alzheimer_model_path = Path("models/alzheimer_model.joblib")
+        alzheimer_model_path = Path("models/alzheimer_rf_model_final.joblib")
         if alzheimer_model_path.exists():
             models['alzheimer'] = joblib.load(alzheimer_model_path)
             st.sidebar.success("✅ Alzheimer's model loaded")
@@ -143,7 +143,7 @@ def load_models():
     
     try:
         # Load Alzheimer's scaler
-        alzheimer_scaler_path = Path("models/alzheimer_scaler.joblib")
+        alzheimer_scaler_path = Path("models/alzheimer_rf_scaler_final.joblib")
         if alzheimer_scaler_path.exists():
             scalers['alzheimer'] = joblib.load(alzheimer_scaler_path)
     except Exception as e:
