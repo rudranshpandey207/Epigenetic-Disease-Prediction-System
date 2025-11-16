@@ -363,8 +363,8 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("### 🔒 Security")
-    st.success("✅ Models encrypted with RSA")
-    st.success("✅ Secure cloud storage")
+    st.success("✅ Fernet Encryption (AES-128)")
+    st.success("✅ PBKDF2 Key Derivation")
 
 # Main content area
 col1, col2 = st.columns([2, 1])
