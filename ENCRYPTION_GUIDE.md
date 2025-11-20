@@ -240,16 +240,12 @@ python decrypt_result_local.py "gAAAAABhx7y8..."
 For non-sensitive or already anonymized data, use standard mode:
 
 1. Select **"Standard Upload"** in sidebar
-2. Upload CSV/PDF/Word/Image files directly
+2. Upload CSV files directly
 3. View results immediately in browser
 
 **Supported formats:**
 
 - 📄 CSV (direct import)
-- 📑 PDF (text extraction)
-- 📝 Word documents (.docx)
-- 🖼️ Images (OCR with Tesseract)
-
 ---
 
 ## 🧪 Testing

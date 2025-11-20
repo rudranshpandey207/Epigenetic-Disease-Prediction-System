@@ -138,7 +138,7 @@ Access the app at **[http://localhost:8501](http://localhost:8501)**
 
 | Disease         | Model Used    | Features | Training Acc | Test Acc |
 | --------------- | ------------- | -------- | ------------ | -------- |
-| Alzheimer's     | Random Forest | 500      | ~95%         | ~92%     |
+| Alzheimer's     | Random Forest | 500      | ~85%         | ~82%     |
 | Prostate Cancer | Random Forest | 2000     | ~98%         | ~94%     |
 
 ---
@@ -155,7 +155,8 @@ Access the app at **[http://localhost:8501](http://localhost:8501)**
 ## 👥 Authors
 
 - **Rudransh Pandey** – Machine Learning & Backend
-- **Team Members (if any)** – Data preprocessing, encryption, and web app integration
+- **Ishan Mittal** – Data preprocessing, encryption
+- **Himangi Rawat** - Web app integration
 
 ---
 
@@ -168,4 +169,4 @@ All datasets are publicly available from the NCBI GEO repository.
 
 ## 💡 Citation
 
-> Pandey, R. (2025). _Epigenetic-Based Disease Prediction Using Machine Learning and Secure Cloud Storage._ Minor Project Report, [Your College Name].
+> Pandey, R. (2025). _Epigenetic-Based Disease Prediction Using Machine Learning and Secure Cloud Storage._ Minor Project Report, Jaypee Institute Of Information Technology.
