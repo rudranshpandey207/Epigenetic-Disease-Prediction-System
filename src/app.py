@@ -352,7 +352,7 @@ with st.sidebar:
     else:
         model_available = 'prostate' in models
         st.info(f"""
-        **Dataset:** GSE26126  
+        **Dataset:** TCGA-PRAD  
         **Model:** Random Forest (2000 features)
         **Status:** {'✅ Loaded' if model_available else '❌ Not Loaded'}  
         **Split:** 70/30 Train/Test
