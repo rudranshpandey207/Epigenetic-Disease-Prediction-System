@@ -167,6 +167,3 @@ All datasets are publicly available from the NCBI GEO repository.
 
 ---
 
-## 💡 Citation
-
-> Pandey, R. (2025). _Epigenetic-Based Disease Prediction Using Machine Learning and Secure Cloud Storage._ Minor Project Report, Jaypee Institute Of Information Technology.

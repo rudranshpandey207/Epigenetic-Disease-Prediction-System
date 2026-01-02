@@ -1,0 +1,35 @@
+{
+  "model": "Alzheimer's Disease",
+  "total_samples": 4,
+  "summary": {
+    "healthy_count": 2,
+    "disease_count": 2,
+    "disease_rate": "50.0%"
+  },
+  "sample_results": [
+    {
+      "sample_number": 1,
+      "prediction": "Disease",
+      "prediction_code": 1,
+      "confidence": "0.8800"
+    },
+    {
+      "sample_number": 2,
+      "prediction": "Healthy",
+      "prediction_code": 0,
+      "confidence": "0.8600"
+    },
+    {
+      "sample_number": 3,
+      "prediction": "Disease",
+      "prediction_code": 1,
+      "confidence": "0.9350"
+    },
+    {
+      "sample_number": 4,
+      "prediction": "Healthy",
+      "prediction_code": 0,
+      "confidence": "0.9200"
+    }
+  ]
+}
