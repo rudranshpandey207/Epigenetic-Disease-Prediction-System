@@ -134,49 +134,30 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Load models function
+
 @st.cache_resource
 def load_models():
     models = {}
     scalers = {}
-    
-    try:
-        # Load Alzheimer's model
-        alzheimer_model_path = MODELS_DIR / "alzheimer_rf_model_final.joblib"
-        if alzheimer_model_path.exists():
-            models['alzheimer'] = joblib.load(alzheimer_model_path)
-            st.sidebar.success("✅ Alzheimer's model loaded")
-        else:
-            st.sidebar.info("ℹ️ Alzheimer's model not found")
-    except Exception as e:
-        st.sidebar.warning(f"⚠️ Alzheimer's model error: {str(e)[:50]}...")
-    
-    try:
-        # Load Alzheimer's scaler
-        alzheimer_scaler_path = MODELS_DIR / "alzheimer_rf_scaler_final.joblib"
-        if alzheimer_scaler_path.exists():
-            scalers['alzheimer'] = joblib.load(alzheimer_scaler_path)
-    except Exception as e:
-        pass
-    
-    try:
-        # Load Prostate model (NEW FILENAME)
-        prostate_model_path = MODELS_DIR / "prostate_rf_model_2000f_70_30.joblib"
-        if prostate_model_path.exists():
-            models['prostate'] = joblib.load(prostate_model_path)
-            st.sidebar.success("✅ Prostate model loaded")
-        else:
-            st.sidebar.info("ℹ️ Prostate model not found")
-    except Exception as e:
-        st.sidebar.error(f"❌ Prostate model error: {str(e)[:50]}...")
-    
-    try:
-        # Load Prostate scaler (NEW FILENAME)
-        prostate_scaler_path = MODELS_DIR / "prostate_rf_scaler_2000f_70_30.joblib"
-        if prostate_scaler_path.exists():
-            scalers['prostate'] = joblib.load(prostate_scaler_path)
-    except Exception as e:
-        pass
-    
+
+    # Alzheimer's model
+    alzheimer_model_path = MODELS_DIR / "alzheimer_rf_model_final.joblib"
+    if alzheimer_model_path.exists():
+        models["alzheimer"] = joblib.load(alzheimer_model_path)
+
+    alzheimer_scaler_path = MODELS_DIR / "alzheimer_rf_scaler_final.joblib"
+    if alzheimer_scaler_path.exists():
+        scalers["alzheimer"] = joblib.load(alzheimer_scaler_path)
+
+    # Prostate model
+    prostate_model_path = MODELS_DIR / "prostate_rf_model_2000f_70_30.joblib"
+    if prostate_model_path.exists():
+        models["prostate"] = joblib.load(prostate_model_path)
+
+    prostate_scaler_path = MODELS_DIR / "prostate_rf_scaler_2000f_70_30.joblib"
+    if prostate_scaler_path.exists():
+        scalers["prostate"] = joblib.load(prostate_scaler_path)
+
     return models, scalers
 
 # Function to prepare data for prediction
@@ -314,6 +295,15 @@ st.markdown('<p class="sub-header">Predict disease risk using epigenetic methyla
 
 # Load models
 models, scalers = load_models()
+if "alzheimer" in models:
+    st.sidebar.success("✅ Alzheimer's model loaded")
+else:
+    st.sidebar.warning("❌ Alzheimer's model not found")
+
+if "prostate" in models:
+    st.sidebar.success("✅ Prostate model loaded")
+else:
+    st.sidebar.warning("❌ Prostate model not found")
 
 # Sidebar
 with st.sidebar:
@@ -380,76 +370,79 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     st.markdown("### 📁 Upload Epigenetic Data")
-    
-    # Check if encrypted mode is selected
     if "Encrypted" in privacy_mode:
-        st.markdown("🔒 **Privacy-Preserving Encrypted Upload Mode**")
-        st.info("""
-        **How it works:**
-        1. Encrypt your data locally using `encrypt_data_local.py`
-        2. Upload the encrypted file (.encrypted)
-        3. Enter your password and salt
-        4. Server decrypts in memory, predicts, and re-encrypts results
-        5. Decrypt results locally using `decrypt_result_local.py`
-        """)
+     st.header("Encrypted Mode")
+     st.success("This mode loaded successfully.")
+     df = None
+    # Check if encrypted mode is selected
+#     if "Encrypted" in privacy_mode:
+#         st.markdown("🔒 **Privacy-Preserving Encrypted Upload Mode**")
+#         st.info("""
+#         **How it works:**
+#         1. Encrypt your data locally using `encrypt_data_local.py`
+#         2. Upload the encrypted file (.encrypted)
+#         3. Enter your password and salt
+#         4. Server decrypts in memory, predicts, and re-encrypts results
+#         5. Decrypt results locally using `decrypt_result_local.py`
+#         """)
         
-        uploaded_file = st.file_uploader(
-            "Upload Encrypted File",
-            type=['encrypted'],
-            help="Upload your .encrypted file created by encrypt_data_local.py"
-        )
+#         uploaded_file = st.file_uploader(
+#             "Upload Encrypted File",
+#             type=['encrypted'],
+#             help="Upload your .encrypted file created by encrypt_data_local.py"
+#         )
         
-        if uploaded_file is not None:
-            col_pwd, col_salt = st.columns(2)
-            with col_pwd:
-                password = st.text_input("🔑 Encryption Password", type="password", 
-                                        help="The password you used to encrypt the file")
-            with col_salt:
-                salt_b64 = st.text_input("🧂 Salt Value", 
-                                        help="The salt value from encryption step")
+#         if uploaded_file is not None:
+#             col_pwd, col_salt = st.columns(2)
+#             with col_pwd:
+#                 password = st.text_input("🔑 Encryption Password", type="password", 
+#                                         help="The password you used to encrypt the file")
+#             with col_salt:
+#                 salt_b64 = st.text_input("🧂 Salt Value", 
+#                                         help="The salt value from encryption step")
             
-            if password and salt_b64:
-                try:
-                    # Derive key from password
-                    salt = base64.b64decode(salt_b64)
-                    key, _ = derive_key_from_password(password, salt)
+#             if password and salt_b64:
+#                 try:
+#                     # Derive key from password
+#                     salt = base64.b64decode(salt_b64)
+#                     key, _ = derive_key_from_password(password, salt)
                     
-                    # Read encrypted file
-                    encrypted_data = uploaded_file.read()
+#                     # Read encrypted file
+#                     encrypted_data = uploaded_file.read()
                     
-                    with st.spinner("🔓 Decrypting file in memory..."):
-                        # Decrypt in memory
-                        decrypted_data = decrypt_data(encrypted_data, key)
+#                     with st.spinner("🔓 Decrypting file in memory..."):
+#                         # Decrypt in memory
+#                         decrypted_data = decrypt_data(encrypted_data, key)
                         
-                        # Convert to DataFrame
-                        df = pd.read_csv(io.BytesIO(decrypted_data))
+#                         # Convert to DataFrame
+#                         df = pd.read_csv(io.BytesIO(decrypted_data))
                         
-                        st.success(f"✅ File decrypted successfully! Shape: {df.shape}")
-                        st.session_state['encryption_key'] = key
-                        st.session_state['encrypted_mode'] = True
+#                         st.success(f"✅ File decrypted successfully! Shape: {df.shape}")
+#                         st.session_state['encryption_key'] = key
+#                         st.session_state['encrypted_mode'] = True
                         
-                except Exception as e:
-                    st.error(f"❌ Decryption failed: {str(e)}")
-                    st.warning("Please check your password and salt values")
-                    df = None
-            else:
-                df = None
-                st.warning("⚠️ Please provide both password and salt to decrypt the file")
-        else:
-            df = None
-            st.info("👆 Please upload your encrypted file")
+#                 except Exception as e:
+#                     st.error(f"❌ Decryption failed: {str(e)}")
+#                     st.warning("Please check your password and salt values")
+#                     df = None
+#             else:
+#                 df = None
+#                 st.warning("⚠️ Please provide both password and salt to decrypt the file")
+#         else:
+#             df = None
+#             st.info("👆 Please upload your encrypted file")
             
-            with st.expander("📖 How to encrypt your data locally"):
-                st.code("""
-# Step 1: Download the encryption script
-# Copy src/encrypt_data_local.py to your local machine
+#             with st.expander("📖 How to encrypt your data locally"):
+#                 st.code("""
+# # Step 1: Download the encryption script
+# # Copy src/encrypt_data_local.py to your local machine
 
-# Step 2: Run the encryption script
-python encrypt_data_local.py your_data.csv
+# # Step 2: Run the encryption script
+# python encrypt_data_local.py your_data.csv
 
-# Step 3: Save the password and salt shown
-# Step 4: Upload the .encrypted file here
-                """, language="bash")
+# # Step 3: Save the password and salt shown
+# # Step 4: Upload the .encrypted file here
+#                 """, language="bash")
     
     else:
         # Standard upload mode
@@ -532,11 +525,13 @@ with col2:
             file_name="example_methylation_data.csv",
             mime="text/csv"
         )
-
+st.write("Reached prediction section")
 # Prediction section
 st.markdown("---")
 st.markdown("### 🔮 Make Prediction")
-
+st.write("df exists?", "df" in locals())
+if "df" in locals():
+    st.write(type(df))
 if df is not None:
     if st.button("🚀 Predict Disease Status", type="primary", use_container_width=True):
         # Select the appropriate model
