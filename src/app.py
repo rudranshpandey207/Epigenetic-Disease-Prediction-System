@@ -8,7 +8,16 @@ import io
 import numpy as np
 import warnings
 import base64
+import sys
+
+SRC_DIR = Path(__file__).resolve().parent
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
 from encryption_utils import derive_key_from_password, decrypt_data, encrypt_result
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+MODELS_DIR = BASE_DIR / "models"
 
 # Suppress sklearn version warnings
 warnings.filterwarnings('ignore', category=UserWarning)
@@ -132,7 +141,7 @@ def load_models():
     
     try:
         # Load Alzheimer's model
-        alzheimer_model_path = Path("models/alzheimer_rf_model_final.joblib")
+        alzheimer_model_path = MODELS_DIR / "alzheimer_rf_model_final.joblib"
         if alzheimer_model_path.exists():
             models['alzheimer'] = joblib.load(alzheimer_model_path)
             st.sidebar.success("✅ Alzheimer's model loaded")
@@ -143,7 +152,7 @@ def load_models():
     
     try:
         # Load Alzheimer's scaler
-        alzheimer_scaler_path = Path("models/alzheimer_rf_scaler_final.joblib")
+        alzheimer_scaler_path = MODELS_DIR / "alzheimer_rf_scaler_final.joblib"
         if alzheimer_scaler_path.exists():
             scalers['alzheimer'] = joblib.load(alzheimer_scaler_path)
     except Exception as e:
@@ -151,7 +160,7 @@ def load_models():
     
     try:
         # Load Prostate model (NEW FILENAME)
-        prostate_model_path = Path("models/prostate_rf_model_2000f_70_30.joblib")
+        prostate_model_path = MODELS_DIR / "prostate_rf_model_2000f_70_30.joblib"
         if prostate_model_path.exists():
             models['prostate'] = joblib.load(prostate_model_path)
             st.sidebar.success("✅ Prostate model loaded")
@@ -162,7 +171,7 @@ def load_models():
     
     try:
         # Load Prostate scaler (NEW FILENAME)
-        prostate_scaler_path = Path("models/prostate_rf_scaler_2000f_70_30.joblib")
+        prostate_scaler_path = MODELS_DIR / "prostate_rf_scaler_2000f_70_30.joblib"
         if prostate_scaler_path.exists():
             scalers['prostate'] = joblib.load(prostate_scaler_path)
     except Exception as e:

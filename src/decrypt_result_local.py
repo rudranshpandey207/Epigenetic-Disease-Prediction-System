@@ -4,6 +4,12 @@ Run this script to decrypt the encrypted results from the Streamlit app
 """
 import sys
 import base64
+from pathlib import Path
+
+SRC_DIR = Path(__file__).resolve().parent
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
 from encryption_utils import derive_key_from_password, decrypt_result
 
 
