@@ -32,106 +32,106 @@ st.set_page_config(
 )
 
 # Custom CSS
-st.markdown("""
-    <style>
-    .main-header {
-        font-size: 3rem;
-        color: #1E88E5;
-        text-align: center;
-        margin-bottom: 1rem;
-        font-weight: bold;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-    }
-    .sub-header {
-        font-size: 1.2rem;
-        color: #333;
-        text-align: center;
-        margin-bottom: 2rem;
-        font-weight: 500;
-    }
-    .prediction-box {
-        padding: 2rem;
-        border-radius: 15px;
-        margin: 1.5rem 0;
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-        border: 3px solid;
-    }
-    .control {
-        background: linear-gradient(135deg, #A5D6A7 0%, #66BB6A 100%);
-        border-color: #2E7D32;
-    }
-    .disease {
-        background: linear-gradient(135deg, #EF9A9A 0%, #E57373 100%);
-        border-color: #C62828;
-    }
-    .prediction-box h3 {
-        color: #000;
-        font-weight: bold;
-        margin-bottom: 0.5rem;
-        font-size: 1.4rem;
-    }
-    .prediction-box h2 {
-        margin: 0.5rem 0;
-        font-size: 2rem;
-        font-weight: bold;
-    }
-    .control h2 {
-        color: #1B5E20;
-    }
-    .disease h2 {
-        color: #B71C1C;
-    }
-    .confidence-text {
-        font-size: 1.5rem;
-        font-weight: bold;
-        margin: 1rem 0;
-    }
-    .control .confidence-text {
-        color: #1B5E20;
-    }
-    .disease .confidence-text {
-        color: #B71C1C;
-    }
-    .prediction-box p {
-        font-size: 1.1rem;
-        line-height: 1.6;
-        color: #000;
-        font-weight: 500;
-    }
-    .prediction-box strong {
-        font-weight: 700;
-        color: #000;
-    }
-    .disclaimer-text {
-        font-size: 0.95rem;
-        margin-top: 1rem;
-        color: #333;
-        font-style: italic;
-        font-weight: 500;
-    }
-    .interpretation-text {
-        font-size: 1rem;
-        margin-top: 1rem;
-        color: #222;
-        font-weight: 600;
-    }
-    .stMetric {
-        background-color: #e3f2fd;
-        padding: 1rem;
-        border-radius: 10px;
-        border: 2px solid #1976d2;
-    }
-    .stMetric label {
-        font-weight: 600;
-        color: #000;
-    }
-    .stMetric [data-testid="stMetricValue"] {
-        font-size: 2rem;
-        font-weight: bold;
-        color: #000;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# st.markdown("""
+#     <style>
+#     .main-header {
+#         font-size: 3rem;
+#         color: #1E88E5;
+#         text-align: center;
+#         margin-bottom: 1rem;
+#         font-weight: bold;
+#         text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+#     }
+#     .sub-header {
+#         font-size: 1.2rem;
+#         color: #333;
+#         text-align: center;
+#         margin-bottom: 2rem;
+#         font-weight: 500;
+#     }
+#     .prediction-box {
+#         padding: 2rem;
+#         border-radius: 15px;
+#         margin: 1.5rem 0;
+#         box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+#         border: 3px solid;
+#     }
+#     .control {
+#         background: linear-gradient(135deg, #A5D6A7 0%, #66BB6A 100%);
+#         border-color: #2E7D32;
+#     }
+#     .disease {
+#         background: linear-gradient(135deg, #EF9A9A 0%, #E57373 100%);
+#         border-color: #C62828;
+#     }
+#     .prediction-box h3 {
+#         color: #000;
+#         font-weight: bold;
+#         margin-bottom: 0.5rem;
+#         font-size: 1.4rem;
+#     }
+#     .prediction-box h2 {
+#         margin: 0.5rem 0;
+#         font-size: 2rem;
+#         font-weight: bold;
+#     }
+#     .control h2 {
+#         color: #1B5E20;
+#     }
+#     .disease h2 {
+#         color: #B71C1C;
+#     }
+#     .confidence-text {
+#         font-size: 1.5rem;
+#         font-weight: bold;
+#         margin: 1rem 0;
+#     }
+#     .control .confidence-text {
+#         color: #1B5E20;
+#     }
+#     .disease .confidence-text {
+#         color: #B71C1C;
+#     }
+#     .prediction-box p {
+#         font-size: 1.1rem;
+#         line-height: 1.6;
+#         color: #000;
+#         font-weight: 500;
+#     }
+#     .prediction-box strong {
+#         font-weight: 700;
+#         color: #000;
+#     }
+#     .disclaimer-text {
+#         font-size: 0.95rem;
+#         margin-top: 1rem;
+#         color: #333;
+#         font-style: italic;
+#         font-weight: 500;
+#     }
+#     .interpretation-text {
+#         font-size: 1rem;
+#         margin-top: 1rem;
+#         color: #222;
+#         font-weight: 600;
+#     }
+#     .stMetric {
+#         background-color: #e3f2fd;
+#         padding: 1rem;
+#         border-radius: 10px;
+#         border: 2px solid #1976d2;
+#     }
+#     .stMetric label {
+#         font-weight: 600;
+#         color: #000;
+#     }
+#     .stMetric [data-testid="stMetricValue"] {
+#         font-size: 2rem;
+#         font-weight: bold;
+#         color: #000;
+#     }
+#     </style>
+# """, unsafe_allow_html=True)
 
 # Load models function
 
@@ -726,9 +726,9 @@ else:
 
 # Footer
 st.markdown("---")
-st.markdown("""
-<div style="text-align: center; color: #666; padding: 2rem;">
-    <p>🔬 Developed by Rudransh Pandey,Ishan Mittal,Himangi Rawat | 🧬 Powered by Machine Learning & Bioinformatics</p>
-    <p>⚠️ <strong>Disclaimer:</strong> This tool is for research purposes only. Not for clinical diagnosis.</p>
-</div>
-""", unsafe_allow_html=True)
+# st.markdown("""
+# <div style="text-align: center; color: #666; padding: 2rem;">
+#     <p>🔬 Developed by Rudransh Pandey,Ishan Mittal,Himangi Rawat | 🧬 Powered by Machine Learning & Bioinformatics</p>
+#     <p>⚠️ <strong>Disclaimer:</strong> This tool is for research purposes only. Not for clinical diagnosis.</p>
+# </div>
+# """, unsafe_allow_html=True)
