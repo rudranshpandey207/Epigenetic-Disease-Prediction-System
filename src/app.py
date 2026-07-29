@@ -319,7 +319,7 @@ models, scalers = load_models()
 with st.sidebar:
     # Try to load local image, fallback to a simple colored placeholder
     try:
-        st.image("assets/dna_logo.png", width="stretch")
+        st.image(str(BASE_DIR / "assests" / "dna_logo.png"), use_container_width=True)
     except:
         st.markdown("""
             <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
@@ -488,7 +488,7 @@ python encrypt_data_local.py your_data.csv
     if 'df' in locals() and df is not None:
         # Display data preview
         with st.expander("📋 Data Preview", expanded=True):
-            st.dataframe(df.head(10), width="stretch")
+            st.dataframe(df.head(10), use_container_width=True)
             
             col_a, col_b, col_c = st.columns(3)
             with col_a:
@@ -518,7 +518,7 @@ with col2:
     """)
     
     # Download example file button
-    if st.button("📥 Download Example CSV", width="stretch"):
+    if st.button("📥 Download Example CSV", use_container_width=True):
         example_data = pd.DataFrame({
             'SampleID': ['Sample1', 'Sample2', 'Sample3'],
             'cg00000029': [0.8234, 0.7123, 0.6789],
@@ -669,7 +669,11 @@ if df is not None:
                             
                             # Display results for each sample
                             for idx, (pred, conf) in enumerate(zip(predictions, confidence)):
-                                sample_name = df.iloc[idx, 0] if df.shape[1] > 0 else f"Sample {idx+1}"
+                                has_sample_id_column = (
+                                    df.shape[1] > 0
+                                    and (df.iloc[:, 0].dtype == 'object' or not str(df.columns[0]).startswith('cg'))
+                                )
+                                sample_name = df.iloc[idx, 0] if has_sample_id_column else f"Sample {idx+1}"
                                 
                                 if pred == 0:
                                     st.markdown(f"""
