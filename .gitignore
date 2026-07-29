@@ -4,7 +4,6 @@ __pycache__/
 *.pyo
 *.pyd
 *.pkl
-*.joblib
 
 # --- Virtual Environment ---
 venv/
@@ -48,7 +47,6 @@ kaggle/input/
 *.bin
 
 # --- Model Files ---
-*.pkl
 *.sav
 *.hdf5
 
